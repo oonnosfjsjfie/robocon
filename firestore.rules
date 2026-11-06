@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    // Owners: always admins, and the only people who can add or remove other admins.
+    // Keep this list the same as OWNER_EMAILS in firebase-config.js.
+    function isOwner() {
+      return signedIn() && myEmail() in [
+        'ajay21022010@gmail.com',
+        'ej15132@tipsglobeducate.com'
+      ];
+    }
+    // Admins: owners, plus anyone an owner added from the admin panel.
+    function isAdmin() {
+      return isOwner()
+        || (signedIn() && exists(/databases/$(database)/documents/admins/$(myEmail())));
+    }
+
+    // Scores and event settings: everyone can read, only admins can change.
+    match /teams/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /config/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Admin list: private. Owners see and edit all of it; an admin can only check their own entry.
+    match /admins/{email} {
+      allow read: if isOwner() || (signedIn() && myEmail() == email);
+      allow write: if isOwner();
+    }
+  }
+}
