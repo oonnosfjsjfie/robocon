@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Robocon Live Scoreboard</title>
+<title>Robocon Live Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -146,6 +146,20 @@ label.f{display:block;font-size:12px;color:var(--muted);letter-spacing:.06em;mar
 .parsed.bad{color:var(--red)} .parsed.ok{color:var(--green)}
 .rowbtns{display:flex;gap:6px;justify-content:flex-end}
 .dirty{box-shadow:inset 3px 0 0 var(--amber)}
+textarea{font:500 13px Inter;color:var(--text);background:rgba(5,8,16,.7);border:1px solid var(--line);border-radius:10px;padding:8px 9px;outline:none;width:100%;min-width:220px;min-height:38px;resize:vertical;line-height:1.4}
+textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,228,255,.15)}
+.penbadge{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-weight:700;font-size:15px;padding:5px 12px;border-radius:999px;color:var(--red);background:rgba(255,84,112,.12);box-shadow:inset 0 0 0 1px rgba(255,84,112,.35);white-space:nowrap}
+.penbadge.zero{color:var(--green);background:rgba(44,245,154,.1);box-shadow:inset 0 0 0 1px rgba(44,245,154,.3)}
+.reasons{list-style:none;display:flex;flex-direction:column;gap:5px}
+.reasons li{font-size:14px;color:var(--text);padding-left:14px;position:relative}
+.reasons li::before{content:"";position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--red)}
+body.tv .reasons{flex-direction:row;flex-wrap:wrap;gap:.4vh 1.4vw}
+body.tv .reasons li{font-size:1.9vh}
+body.tv .penbadge{font-size:2.2vh}
+.ov .pl{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(120,160,255,.07);font-size:14px}
+.ov .pl b{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;min-width:60px}
+.ov .pl span{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov .pl em{font-style:normal;color:var(--red);font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;white-space:nowrap}
 .row-form{display:grid;grid-template-columns:3fr auto;gap:12px;align-items:end;padding:18px 22px}
 .settings{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:12px;align-items:end;padding:18px 22px}
 .help{padding:0 22px 18px;color:var(--muted);font-size:13px;line-height:1.6}
@@ -183,6 +197,7 @@ body.tv .pod .medal{width:4.8vh;height:4.8vh;font-size:2vh}
 body.tv .pod .tid{font-size:3.8vh}
 body.tv .pod .ft{font-size:5vh}
 body.tv .pod .meta{font-size:1.7vh}
+body.tv #view{flex:1;min-height:0;display:flex;flex-direction:column}
 body.tv .card{flex:1;min-height:0;display:flex;flex-direction:column}
 body.tv .card h3{font-size:1.8vh;padding:1.5vh 1.6vw}
 body.tv .card h3 .hint{font-size:1.6vh}
@@ -246,7 +261,7 @@ body.tv.fs .fsbtn{display:none}
       </div>
     </div>
     <nav class="tabs">
-      <a href="#board" data-v="board">Scoreboard</a>
+      <a href="#board" data-v="board">Penalties</a>
       <a href="#tv" data-v="tv">TV display</a>
       <a href="#admin" data-v="admin" id="adminTab" style="display:none">Admin</a>
     </nav>
@@ -288,7 +303,7 @@ const DEFAULT_CFG = {title:"ROBOCON", subtitle:"Hosted by TIPS Kochi School", pe
 
 /* ---------- state ---------- */
 let backend = null, me = null, isAdmin = false, isOwner = false, adminList = [], unsubAdmins = null;
-let teams = [], cfg = {...DEFAULT_CFG};
+let teams = [], pub = [], cfg = {...DEFAULT_CFG}, unsubTeams = null, synced = false;
 let loaded = false, connected = false;
 let view = "board", cat = null;           // cat = category id, or null for overview
 let tvPinned = null, tvCatIdx = 0, tvPage = 0, tvTimer = null, tvStart = 0;
@@ -408,46 +423,60 @@ function catHeadHTML(c){ return `<div class="cathead"><div class="ic">${ICONS[c.
 function setAccent(color){ document.documentElement.style.setProperty("--accent", color || "#22e4ff"); }
 
 /* ---------- views ---------- */
+const byTeam = (a,b)=>String(a.teamId).localeCompare(String(b.teamId),undefined,{numeric:true});
+function penWord(type,n){ return type==="time" ? (n===1?"penalty":"penalties") : (n===1?"penalty point":"penalty points"); }
+function pubOf(d){ return {category:d.category, teamId:d.teamId, status:d.status||"", penalties:Number(d.penalties)||0, reasons:Array.isArray(d.reasons)?d.reasons:[], updatedAt:d.updatedAt||Date.now()}; }
 function catChips(active, prefix){
   return `<nav class="cats">
     <a class="cat ${!active?"on":""}" href="#${prefix}" style="--c:#8b5cff"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><span>All categories<small>Overview</small></span></a>
-    ${CATS.map(c=>`<a class="cat ${active===c.id?"on":""}" href="#${prefix}-${c.id}" style="--c:${c.color}"><span class="ic">${ICONS[c.icon]}</span><span>${esc(c.short)}<small>${teams.filter(t=>t.category===c.id).length} teams</small></span></a>`).join("")}
+    ${CATS.map(c=>`<a class="cat ${active===c.id?"on":""}" href="#${prefix}-${c.id}" style="--c:${c.color}"><span class="ic">${ICONS[c.icon]}</span><span>${esc(c.short)}<small>${pub.filter(t=>t.category===c.id).length} teams</small></span></a>`).join("")}
   </nav>`;
+}
+const PEN_HEAD = `<thead><tr><th>Team ID</th><th>Status</th><th>Penalties</th><th>Reasons</th></tr></thead>`;
+function penRowHTML(t, type){
+  const sig = JSON.stringify([t.penalties,t.reasons,t.status]);
+  const flash = prevSig[t.id]!==undefined && prevSig[t.id]!==sig ? " flash" : ""; prevSig[t.id]=sig;
+  const n = t.penalties||0;
+  return `<tr class="${flash}">
+    <td class="team">${esc(t.teamId)}</td>
+    <td>${t.status?`<span class="pill ${statusClass(type,t.status)}">${esc(t.status)}</span>`:`<span class="dim">—</span>`}</td>
+    <td>${n?`<span class="penbadge">${fmtNum(n)} ${penWord(type,n)}</span>`:`<span class="penbadge zero">None</span>`}</td>
+    <td>${t.reasons.length?`<ul class="reasons">${t.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`:`<span class="dim">${n?"No reason given yet":"—"}</span>`}</td>
+  </tr>`;
 }
 function renderOverview(){
   setAccent("#22e4ff");
-  const fin = teams.filter(t=>["Finished","Judged","Qualified","Eliminated"].includes(t.status)).length;
+  const withPen = pub.filter(t=>t.penalties>0);
   $("#view").innerHTML = `
     ${catChips(null,"board")}
     <section class="stats">
       <div class="stat"><div class="k">Categories</div><div class="v">${CATS.length}</div></div>
-      <div class="stat"><div class="k">Teams</div><div class="v">${teams.length}</div></div>
-      <div class="stat"><div class="k">Results in</div><div class="v">${fin}<small> / ${teams.length}</small></div></div>
+      <div class="stat"><div class="k">Teams</div><div class="v">${pub.length}</div></div>
+      <div class="stat"><div class="k">Teams with penalties</div><div class="v">${withPen.length}<small> / ${pub.length}</small></div></div>
       <div class="stat"><div class="k">Status</div><div class="v" style="font-size:16px;margin-top:14px"><span class="live" id="liveBoard"><i></i>LIVE</span></div></div>
     </section>
     <section class="overview">
-      ${CATS.map(c=>{ const l=ranked(c.id).filter(t=>t.rank).slice(0,5);
+      ${CATS.map(c=>{ const l=pub.filter(t=>t.category===c.id && t.penalties>0).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,6);
         return `<a class="ov" href="#board-${c.id}" style="--c:${c.color}">
-          <div class="hd"><div class="ic">${ICONS[c.icon]}</div><div><b>${esc(c.name)}</b><span>${esc(c.tag)}</span></div></div>
-          ${l.length?`<ol>${l.map(t=>`<li><span class="r">${t.rank}</span><span class="n">${esc(t.teamId)}</span><span class="s">${scoreText(t,c.type).replace(/<small>pts<\/small>/," pts")}</span></li>`).join("")}</ol>`
-                   :`<div class="dim" style="padding:14px 0;font-size:14px">${loaded?"No results yet":"Loading…"}</div>`}
+          <div class="hd"><div class="ic">${ICONS[c.icon]}</div><div><b>${esc(c.name)}</b><span>Latest penalties</span></div></div>
+          ${l.length?l.map(t=>`<div class="pl"><b>${esc(t.teamId)}</b><span>${esc(t.reasons[t.reasons.length-1]||"")}</span><em>${fmtNum(t.penalties)} ${penWord(c.type,t.penalties)}</em></div>`).join("")
+                   :`<div class="dim" style="padding:14px 0;font-size:14px">${loaded?"No penalties so far":"Loading…"}</div>`}
         </a>`;}).join("")}
     </section>
-    <p class="note">Tap a category for its full leaderboard. Scores update by themselves.</p>`;
+    <p class="note">Tap a category to see every team. This page updates by itself.</p>`;
   setLive();
 }
 function renderCategory(catId){
   const c = catById(catId); setAccent(c.color);
-  const list = ranked(catId);
+  const list = pub.filter(t=>t.category===catId).sort(byTeam);
   $("#view").innerHTML = `
     ${catChips(catId,"board")}
-    ${catHeadHTML(c)}
-    ${podiumHTML(list,c.type)}
+    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>Penalties and reasons</p></div></div>
     <section class="card">
-      <h3>Leaderboard <span class="hint">${rulesHint(c.type)}</span></h3>
-      ${list.length?`<div class="scroll"><table><thead>${headHTML(c.type)}</thead><tbody>${list.map(t=>rowHTML(t,c.type)).join("")}</tbody></table></div>`:emptyState()}
+      <h3>Penalties <span class="hint">Updates automatically</span></h3>
+      ${list.length?`<div class="scroll"><table>${PEN_HEAD}<tbody>${list.map(t=>penRowHTML(t,c.type)).join("")}</tbody></table></div>`:emptyState()}
     </section>
-    <p class="note"><span class="live" id="liveBoard"><i></i>LIVE</span> &nbsp;Scores update by themselves. Use <a href="#tv-${c.id}">TV display</a> for the big screen.</p>`;
+    <p class="note"><span class="live" id="liveBoard"><i></i>LIVE</span> &nbsp;Use <a href="#tv-${c.id}">TV display</a> for the big screen.</p>`;
   setLive();
 }
 
@@ -456,18 +485,17 @@ const TV_PAGE_MS = 9000;
 function tvCats(){ return tvPinned ? [tvPinned] : CATS.map(c=>c.id); }
 function tvRowsPerPage(){
   const box = $("#tvBox"); if (!box) return 8;
-  return Math.max(3, Math.floor((box.clientHeight - innerHeight*0.055) / (innerHeight*0.066)));
+  return Math.max(3, Math.floor((box.clientHeight - innerHeight*0.055) / (innerHeight*0.075)));
 }
 function renderTV(){
   const ids = tvCats(); if (tvCatIdx >= ids.length) tvCatIdx = 0;
   const c = catById(ids[tvCatIdx]); setAccent(c.color);
   $("#catDots").innerHTML = tvPinned ? "" : CATS.map(x=>`<span class="${x.id===c.id?"on":""}">${esc(x.short)}</span>`).join("");
-  const list = ranked(c.id);
+  const list = pub.filter(t=>t.category===c.id).sort(byTeam);
   $("#view").innerHTML = `
-    ${catHeadHTML(c)}
-    ${podiumHTML(list,c.type)}
+    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>Penalties and reasons</p></div></div>
     <section class="card">
-      <h3>Leaderboard <span class="hint" id="tvHint"></span></h3>
+      <h3>Penalties <span class="hint" id="tvHint"></span></h3>
       <div class="tablebox" id="tvBox">${list.length?"":emptyState()}</div>
       <div class="progress"><i id="tvProg"></i></div>
     </section>`;
@@ -475,9 +503,9 @@ function renderTV(){
   if (list.length){
     const per = tvRowsPerPage(); pages = Math.max(1, Math.ceil(list.length/per));
     if (tvPage >= pages) tvPage = 0;
-    $("#tvBox").innerHTML = `<table class="page-anim"><thead>${headHTML(c.type)}</thead><tbody>${list.slice(tvPage*per,tvPage*per+per).map(t=>rowHTML(t,c.type)).join("")}</tbody></table>`;
+    $("#tvBox").innerHTML = `<table class="page-anim">${PEN_HEAD}<tbody>${list.slice(tvPage*per,tvPage*per+per).map(t=>penRowHTML(t,c.type)).join("")}</tbody></table>`;
   }
-  $("#tvHint").innerHTML = pages>1 ? `<span class="pager">${Array.from({length:pages},(_,i)=>`<i class="${i===tvPage?"on":""}"></i>`).join("")}</span>` : rulesHint(c.type);
+  $("#tvHint").innerHTML = pages>1 ? `<span class="pager">${Array.from({length:pages},(_,i)=>`<i class="${i===tvPage?"on":""}"></i>`).join("")}</span>` : "Updates automatically";
   renderTV.pages = pages;
   animateProgress();
   setLive();
@@ -506,7 +534,7 @@ function draftOf(t){
   if (drafts[t.id]) return drafts[t.id];
   return {teamId:t.teamId??"", status:t.status||STATUSES[catById(t.category).type][0],
     a1:t.a1raw ?? (t.a1??""), a2:t.a2raw ?? (t.a2??""), penalties:t.penalties??0,
-    score:t.score??"", w:t.w??0, d:t.d??0, l:t.l??0, gf:t.gf??0, ga:t.ga??0};
+    score:t.score??"", w:t.w??0, d:t.d??0, l:t.l??0, gf:t.gf??0, ga:t.ga??0, reasons:(t.reasons||[]).join("\n")};
 }
 function parsedLabel(v){ const p=parseTime(v); if (p===null) return {cls:"",txt:""}; if (isNaN(p)) return {cls:"bad",txt:"can't read this"}; return {cls:"ok",txt:"= "+fmtSec(p)}; }
 function draftToTeam(d){ return {a1:parseTime(d.a1), a2:parseTime(d.a2), penalties:d.penalties, score: d.score===""||d.score==null?null:+d.score, w:d.w,d:d.d,l:d.l,gf:d.gf,ga:d.ga}; }
@@ -528,14 +556,16 @@ function adminRowHTML(t, type){
   return `<tr data-id="${id}" class="${drafts[t.id]?"dirty":""}">
     <td><input class="tin" data-f="teamId" value="${esc(d.teamId)}"></td>
     <td><select data-f="status">${STATUSES[type].map(s=>`<option ${s===d.status?"selected":""}>${s}</option>`).join("")}</select></td>
-    ${mid}<td class="prev">${previewHTML(d,type)}</td>
+    ${mid}<td><textarea data-f="reasons" rows="2" placeholder="One reason per line, e.g. Touched the robot during run">${esc(d.reasons)}</textarea></td><td class="prev">${previewHTML(d,type)}</td>
     <td><div class="rowbtns"><button class="btn sm" data-act="save">Save</button><button class="btn sm danger" data-act="del">Delete</button></div></td></tr>`;
 }
 function adminHeadHTML(type){
   const a = type==="time" ? `<th>Attempt 1</th><th>Attempt 2</th><th>Penalties</th><th>Final</th>`
           : type==="points" ? `<th>Judges' score</th><th>Penalty pts</th><th>Final</th>`
           : `<th>Won</th><th>Drawn</th><th>Lost</th><th>Goals for</th><th>Goals against</th><th>Penalty pts</th><th>Points</th>`;
-  return `<tr><th>Team ID</th><th>Status</th>${a}<th></th></tr>`;
+  const parts = a.split("</th>").filter(Boolean).map(x=>x+"</th>");
+  const last = parts.pop();
+  return `<tr><th>Team ID</th><th>Status</th>${parts.join("")}<th>Penalty reasons</th>${last}<th></th></tr>`;
 }
 function renderAdmin(){
   setAccent(catById(adminCat).color);
@@ -553,7 +583,7 @@ function renderAdmin(){
       <form class="row-form" id="addForm"><div><label class="f">Team ID(s)</label><input id="newIds" placeholder="e.g. T01, T02, T03" autocomplete="off"></div><button class="btn" type="submit">Add</button></form>
     </section>
     <section class="card">
-      <h3>${esc(c.name)} scores <span class="hint">${c.type==="time"?"Type times like <b>1 min 20 sec</b>, <b>1m 20s</b>, <b>1:20</b> or <b>80</b>":rulesHint(c.type)}</span></h3>
+      <h3>${esc(c.name)} scores <span class="hint">Scores stay private: the public pages only show penalties and reasons. ${c.type==="time"?"Type times like <b>1 min 20 sec</b>, <b>1m 20s</b>, <b>1:20</b> or <b>80</b>":rulesHint(c.type)}</span></h3>
       ${list.length?`<div class="scroll"><table class="edit"><thead>${adminHeadHTML(c.type)}</thead><tbody>${list.map(t=>adminRowHTML(t,c.type)).join("")}</tbody></table></div>`
                   :`<div class="empty-state"><b>No teams in this category</b>Add team IDs above.</div>`}
     </section>
@@ -600,7 +630,7 @@ function bindAdmin(){
     if (!fresh.length){ toast(ids.length?"Those teams are already in this category.":"Type a team ID first."); return; }
     const btn = e.submitter || $("#addForm button"); btn.disabled = true;
     try{
-      for (const id of fresh) await backend.addTeam({category:adminCat, teamId:id, status:STATUSES[type][0], penalties:0, updatedAt:Date.now()});
+      for (const id of fresh) await backend.addTeam({category:adminCat, teamId:id, status:STATUSES[type][0], penalties:0, reasons:[], updatedAt:Date.now()});
       toast(`Added ${fresh.length} team${fresh.length>1?"s":""}`); $("#newIds").value="";
     }catch(err){ writeErr(err); }
     btn.disabled = false;
@@ -618,7 +648,8 @@ function bindAdmin(){
     tr.querySelector('[data-act="save"]').addEventListener("click", async ev=>{
       const d = drafts[id] || draftOf(t), tid = String(d.teamId).trim();
       if (!tid){ toast("Team ID can't be empty.", true); return; }
-      const data = {category:t.category, teamId:tid, status:d.status, updatedAt:Date.now()};
+      const data = {category:t.category, teamId:tid, status:d.status, updatedAt:Date.now(),
+        reasons:String(d.reasons??"").split("\n").map(x=>x.trim()).filter(Boolean)};
       if (type==="time"){
         const a1=parseTime(d.a1), a2=parseTime(d.a2);
         if (Number.isNaN(a1)||Number.isNaN(a2)){ toast("A time couldn't be read. Try a format like 1 min 20 sec.", true); return; }
@@ -671,7 +702,7 @@ function setLive(){
     el.lastChild.textContent = connected ? "LIVE" : (loaded ? "RECONNECTING" : "CONNECTING");
   });
 }
-function applyCfg(){ $("#evTitle").textContent = cfg.title||DEFAULT_CFG.title; $("#evSub").textContent = cfg.subtitle||""; document.title = (cfg.title||"Robocon")+" · Live Scoreboard"; }
+function applyCfg(){ $("#evTitle").textContent = cfg.title||DEFAULT_CFG.title; $("#evSub").textContent = cfg.subtitle||""; document.title = (cfg.title||"Robocon")+" · Live Board"; }
 function render(fromData){
   document.querySelectorAll("nav.tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===view));
   document.body.classList.toggle("tv", view==="tv");
@@ -680,7 +711,7 @@ function render(fromData){
   if (view==="admin"){
     // keep an admin's half-typed edits when someone else saves
     const a = document.activeElement;
-    if (fromData && a && a.closest && a.closest("table.edit, #addForm, #cfgForm")) return;
+    if (fromData && a && a.closest && a.closest("table.edit, #addForm, #cfgForm, #admForm")) return;
     return renderAdmin();
   }
   return cat ? renderCategory(cat) : renderOverview();
@@ -715,11 +746,13 @@ async function firebaseBackend(conf){
   const a = app.initializeApp(conf), db = fs.getFirestore(a), auth = au.getAuth(a);
   return {
     kind:"firebase",
-    watchTeams(next, err){ return fs.onSnapshot(fs.collection(db,"teams"), {includeMetadataChanges:true}, s=>next(s.docs.map(d=>({id:d.id,...d.data()})), !s.metadata.fromCache), err); },
+    watchPublic(next, err){ return fs.onSnapshot(fs.collection(db,"public"), {includeMetadataChanges:true}, s=>next(s.docs.map(d=>({id:d.id,...d.data()})), !s.metadata.fromCache), err); },
+    watchTeams(next, err){ return fs.onSnapshot(fs.collection(db,"teams"), s=>next(s.docs.map(d=>({id:d.id,...d.data()}))), err); },
     watchCfg(next){ return fs.onSnapshot(fs.doc(db,"config","event"), s=>next(s.exists()?s.data():{})); },
-    addTeam:d=>fs.addDoc(fs.collection(db,"teams"), d),
-    saveTeam:(id,d)=>fs.setDoc(fs.doc(db,"teams",id), d),
-    deleteTeam:id=>fs.deleteDoc(fs.doc(db,"teams",id)),
+    async addTeam(d){ const ref=fs.doc(fs.collection(db,"teams")), b=fs.writeBatch(db); b.set(ref,d); b.set(fs.doc(db,"public",ref.id),pubOf(d)); await b.commit(); },
+    async saveTeam(id,d){ const b=fs.writeBatch(db); b.set(fs.doc(db,"teams",id),d); b.set(fs.doc(db,"public",id),pubOf(d)); await b.commit(); },
+    async deleteTeam(id){ const b=fs.writeBatch(db); b.delete(fs.doc(db,"teams",id)); b.delete(fs.doc(db,"public",id)); await b.commit(); },
+    async syncPublic(list){ const b=fs.writeBatch(db); list.forEach(t=>{ const {id,...d}=t; b.set(fs.doc(db,"public",id),pubOf(d)); }); await b.commit(); },
     saveCfg:d=>fs.setDoc(fs.doc(db,"config","event"), d),
     onAuth:cb=>au.onAuthStateChanged(auth, u=>cb(u?{email:(u.email||"").toLowerCase()}:null)),
     signIn:()=>au.signInWithPopup(auth, new au.GoogleAuthProvider()),
@@ -731,18 +764,19 @@ async function firebaseBackend(conf){
   };
 }
 function demoBackend(){
-  const KEY="robocon-demo-v1", ch = ("BroadcastChannel" in window) ? new BroadcastChannel(KEY) : null;
-  const subs = new Set(), cfgSubs = new Set(), authSubs = new Set(), admSubs = new Set();
+  const KEY="robocon-demo-v2", ch = ("BroadcastChannel" in window) ? new BroadcastChannel(KEY) : null;
+  const subs = new Set(), pubSubs = new Set(), cfgSubs = new Set(), authSubs = new Set(), admSubs = new Set();
+  const pubList = ()=>st.teams.map(t=>({id:t.id, ...pubOf(t)}));
   const load = ()=>{ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } };
   let st = load();
   if (!st){
     const mk=(category,teamId,x)=>({id:Math.random().toString(36).slice(2,10), category, teamId, penalties:0, ...x});
     st = {cfg:{...DEFAULT_CFG}, teams:[
-      mk("race","R01",{status:"Finished",a1:80,a2:65,a1raw:"1 min 20 sec",a2raw:"1 min 5 sec",penalties:1}),
+      mk("race","R01",{status:"Finished",a1:80,a2:65,a1raw:"1 min 20 sec",a2raw:"1 min 5 sec",penalties:1,reasons:["Touched the robot during the run"]}),
       mk("race","R02",{status:"Finished",a1:72,a2:78,a1raw:"1m 12s",a2raw:"1m 18s"}),
       mk("race","R03",{status:"Attempt 1 done",a1:90,a1raw:"1:30"}),
       mk("race","R04",{status:"Not started"}),
-      mk("build","B01",{status:"Judged",score:86,penalties:2}),
+      mk("build","B01",{status:"Judged",score:86,penalties:2,reasons:["Late submission","Exceeded size limit"]}),
       mk("build","B02",{status:"Judged",score:91}),
       mk("build","B03",{status:"Judging",score:74}),
       mk("soccer-jr","J01",{status:"Playing",w:2,d:1,l:0,gf:6,ga:2}),
@@ -754,13 +788,15 @@ function demoBackend(){
     try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
   }
   let user = null;
-  const emit = ()=>{ subs.forEach(f=>f(st.teams.map(t=>({...t})), true)); cfgSubs.forEach(f=>f({...st.cfg})); admSubs.forEach(f=>f([...(st.admins||[])])); };
+  const emit = ()=>{ subs.forEach(f=>f(st.teams.map(t=>({...t})))); pubSubs.forEach(f=>f(pubList(), true)); cfgSubs.forEach(f=>f({...st.cfg})); admSubs.forEach(f=>f([...(st.admins||[])])); };
   const save = ()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} ch && ch.postMessage(1); emit(); };
   ch && (ch.onmessage = ()=>{ st = load() || st; emit(); });
   addEventListener("storage", e=>{ if(e.key===KEY){ st = load() || st; emit(); } });
   return {
     kind:"demo",
-    watchTeams(next){ subs.add(next); setTimeout(()=>next(st.teams.map(t=>({...t})), true), 150); return ()=>subs.delete(next); },
+    watchPublic(next){ pubSubs.add(next); setTimeout(()=>next(pubList(), true), 150); return ()=>pubSubs.delete(next); },
+    watchTeams(next){ subs.add(next); setTimeout(()=>next(st.teams.map(t=>({...t}))), 50); return ()=>subs.delete(next); },
+    async syncPublic(){},
     watchCfg(next){ cfgSubs.add(next); next({...st.cfg}); return ()=>cfgSubs.delete(next); },
     async addTeam(d){ st.teams.push({id:Math.random().toString(36).slice(2,10), ...d}); save(); },
     async saveTeam(id,d){ st.teams = st.teams.map(t=>t.id===id?{id,...d}:t); save(); },
@@ -785,8 +821,8 @@ route();
   catch(e){ console.error(e); $("#demoBar").innerHTML = `<div class="demo">Couldn't connect to Firebase. Check the internet connection and the settings in <b>firebase-config.js</b>.</div>`; loaded=true; render(); return; }
   if (backend.kind==="demo") $("#demoBar").innerHTML = `<div class="demo"><b>Demo mode.</b> Showing sample teams saved only in this browser. Connect Firebase in <b>firebase-config.js</b> to go live (see README).</div>`;
   let loadTimer = setTimeout(()=>{ loaded=true; connected=false; render(true); }, 10000);
-  const watch = () => backend.watchTeams((list, server)=>{
-    teams = list; loaded = true;
+  const watch = () => backend.watchPublic((list, server)=>{
+    pub = list; loaded = true;
     if (server){ connected = true; clearTimeout(loadTimer); } else connected = false;
     render(true);
   }, err=>{ console.error(err); connected=false; setLive(); setTimeout(watch, 5000); });
@@ -797,6 +833,13 @@ route();
     isOwner = !!u && OWNER_EMAILS.includes(u.email);
     isAdmin = isOwner || (!!u && await backend.isListedAdmin(u.email));
     if (unsubAdmins){ unsubAdmins(); unsubAdmins = null; } adminList = [];
+    if (unsubTeams){ unsubTeams(); unsubTeams = null; } teams = [];
+    if (isAdmin) unsubTeams = backend.watchTeams(list=>{
+      teams = list;
+      // one-time: copy penalties of teams added before the public board existed
+      if (!synced && loaded){ synced = true; const have = new Set(pub.map(p=>p.id)); const missing = list.filter(t=>!have.has(t.id)); if (missing.length) backend.syncPublic(missing).catch(e=>console.error(e)); }
+      if (view==="admin") render(true);
+    }, e=>console.error(e));
     if (isOwner) unsubAdmins = backend.watchAdmins(list=>{ adminList = list; if (view==="admin") render(true); });
     updateAdminUI();
     if (view==="admin") renderAdmin();
