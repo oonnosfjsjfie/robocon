@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robocon Live Scoreboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#05070d; --panel:rgba(16,22,38,.72); --panel2:rgba(22,30,52,.85);
+  --line:rgba(120,160,255,.14); --text:#e8eeff; --muted:#8a96b8;
+  --cyan:#22e4ff; --violet:#8b5cff; --pink:#ff3d9a; --green:#2cf59a; --amber:#ffc43d; --red:#ff5470;
+  --gold:#ffd25e; --silver:#cfd8ea; --bronze:#e59a5c; --accent:var(--cyan);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;overflow-x:hidden;min-height:100vh}
+a{color:var(--cyan)}
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.bg .grid{position:absolute;inset:-50%;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:56px 56px;transform:perspective(700px) rotateX(58deg) translateY(-10%);transform-origin:center top;animation:gridmove 14s linear infinite;mask-image:linear-gradient(to bottom,transparent 5%,#000 45%,transparent 95%);-webkit-mask-image:linear-gradient(to bottom,transparent 5%,#000 45%,transparent 95%)}
+@keyframes gridmove{to{background-position:0 56px,0 0}}
+.bg .orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.45}
+.bg .o1{width:520px;height:520px;background:var(--violet);top:-160px;left:-120px;animation:float 18s ease-in-out infinite}
+.bg .o2{width:460px;height:460px;background:var(--accent);bottom:-180px;right:-120px;opacity:.3;animation:float 22s ease-in-out infinite reverse;transition:background 1s}
+.bg .o3{width:300px;height:300px;background:var(--pink);top:40%;left:55%;opacity:.18;animation:float 26s ease-in-out infinite}
+@keyframes float{50%{transform:translate(60px,40px) scale(1.1)}}
+
+.wrap{max-width:1280px;margin:0 auto;padding:28px 24px 60px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:16px}
+.logo{width:58px;height:58px;flex:none}
+.brand h1{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:900;font-size:clamp(26px,4vw,40px);letter-spacing:.08em;line-height:1;background:linear-gradient(90deg,#fff,var(--cyan) 45%,var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand .sub{color:var(--muted);font-size:13px;letter-spacing:.22em;text-transform:uppercase;margin-top:6px}
+nav.tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);padding:5px;border-radius:14px;backdrop-filter:blur(10px)}
+nav.tabs a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;padding:9px 16px;border-radius:10px;transition:.2s}
+nav.tabs a:hover{color:var(--text)}
+nav.tabs a.on{background:linear-gradient(135deg,rgba(34,228,255,.18),rgba(139,92,255,.25));color:#fff;box-shadow:inset 0 0 0 1px rgba(34,228,255,.35)}
+.live{display:inline-flex;align-items:center;gap:8px;font-family:Orbitron,Inter,system-ui,sans-serif;font-size:12px;letter-spacing:.2em;color:var(--green)}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 1.6s infinite}
+.live.off{color:var(--amber)} .live.off i{background:var(--amber);box-shadow:0 0 12px var(--amber)}
+@keyframes pulse{50%{opacity:.3;transform:scale(.7)}}
+.demo{background:linear-gradient(90deg,rgba(255,196,61,.16),rgba(255,61,154,.12));border:1px solid rgba(255,196,61,.4);color:#ffe3a3;padding:10px 16px;border-radius:12px;font-size:13px;margin-bottom:18px;line-height:1.5}
+
+/* category chips */
+.cats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.cat{--c:var(--cyan);display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:10px 16px 10px 12px;border-radius:14px;font-weight:600;font-size:14px;transition:.2s;backdrop-filter:blur(10px)}
+.cat:hover{color:var(--text);border-color:color-mix(in srgb,var(--c) 50%,transparent)}
+.cat .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.cat .ic svg{width:18px;height:18px}
+.cat.on{color:#fff;border-color:var(--c);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 22%,transparent),rgba(16,22,38,.8));box-shadow:0 0 28px -10px var(--c)}
+.cat small{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.04em}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px;backdrop-filter:blur(10px)}
+.stat .k{color:var(--muted);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.stat .v{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;font-size:28px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat .v small{font-size:14px;color:var(--muted);font-family:Inter;font-weight:500}
+
+.cathead{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.cathead .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);box-shadow:0 0 30px -8px var(--accent)}
+.cathead .ic svg{width:26px;height:26px}
+.cathead h2{font-family:Orbitron,Inter,system-ui,sans-serif;font-size:clamp(20px,2.6vw,28px);letter-spacing:.06em}
+.cathead p{color:var(--muted);font-size:13px;margin-top:3px}
+
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:end;margin-bottom:26px}
+.pod{position:relative;border-radius:20px;padding:22px 20px 20px;text-align:center;background:var(--panel2);border:1px solid var(--line);overflow:hidden;backdrop-filter:blur(12px)}
+.pod::before{content:"";position:absolute;inset:0;border-radius:20px;padding:1.5px;background:linear-gradient(160deg,var(--c),transparent 60%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.pod::after{content:"";position:absolute;width:200px;height:200px;left:50%;top:-120px;transform:translateX(-50%);background:var(--c);filter:blur(70px);opacity:.25}
+.pod.p1{--c:var(--gold);padding-top:30px;padding-bottom:30px}
+.pod.p2{--c:var(--silver)} .pod.p3{--c:var(--bronze)}
+.pod .medal{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:900;font-size:15px;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;color:#0a0d16;background:var(--c);box-shadow:0 0 24px var(--c)}
+.pod .tid{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;font-size:clamp(20px,2.6vw,30px);letter-spacing:.04em;word-break:break-word}
+.pod .ft{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-weight:700;font-size:clamp(26px,3.4vw,42px);color:var(--c);margin-top:8px;text-shadow:0 0 18px color-mix(in srgb,var(--c) 50%,transparent)}
+.pod .ft small{font-size:.42em;color:var(--muted);margin-left:4px}
+.pod .meta{color:var(--muted);font-size:13px;margin-top:6px}
+.pod.empty .tid{color:var(--muted);font-size:18px}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;backdrop-filter:blur(12px);overflow:hidden}
+.card h3{font-family:Orbitron,Inter,system-ui,sans-serif;font-size:15px;letter-spacing:.18em;text-transform:uppercase;padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.card h3 .hint{font-family:Inter;letter-spacing:0;text-transform:none;font-weight:500;color:var(--muted);font-size:13px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:13px 14px;border-bottom:1px solid rgba(120,160,255,.07);font-size:15px;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr{transition:background .3s}
+tbody tr:hover{background:rgba(34,228,255,.04)}
+.num{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-weight:500}
+.rank{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;width:56px;color:var(--muted)}
+.rank.r1{color:var(--gold)} .rank.r2{color:var(--silver)} .rank.r3{color:var(--bronze)}
+.team{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;letter-spacing:.03em}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.s0{color:var(--muted);background:rgba(138,150,184,.12)}
+.s1{color:var(--cyan);background:rgba(34,228,255,.12)}
+.s2{color:var(--violet);background:rgba(139,92,255,.16)}
+.s3{color:var(--green);background:rgba(44,245,154,.12)}
+.sx{color:var(--red);background:rgba(255,84,112,.12)}
+.best{display:inline-flex;flex-direction:column;align-items:flex-start;padding:6px 12px;border-radius:10px;background:rgba(44,245,154,.14);box-shadow:inset 0 0 0 1px rgba(44,245,154,.45);color:var(--green)}
+.best b{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-size:15px}
+.best em{font-style:normal;font-size:10px;letter-spacing:.08em;opacity:.85}
+.dim{color:var(--muted)}
+.pen{color:var(--red);font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
+.final{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-weight:700;font-size:17px;color:#fff}
+.final.hl{color:var(--green)}
+.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%{background:rgba(44,245,154,.35)}100%{background:transparent}}
+.empty-state{padding:50px 20px;text-align:center;color:var(--muted)}
+.empty-state b{display:block;font-family:Orbitron,Inter,system-ui,sans-serif;color:var(--text);font-size:18px;margin-bottom:8px;letter-spacing:.06em}
+.note{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+
+/* overview */
+.overview{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.ov{--c:var(--cyan);text-decoration:none;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;transition:.2s;backdrop-filter:blur(12px);position:relative;overflow:hidden}
+.ov:hover{border-color:var(--c);transform:translateY(-2px)}
+.ov::after{content:"";position:absolute;width:180px;height:180px;right:-60px;top:-60px;background:var(--c);filter:blur(70px);opacity:.18}
+.ov .hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.ov .hd .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c)}
+.ov .hd .ic svg{width:21px;height:21px}
+.ov .hd b{font-family:Orbitron,Inter,system-ui,sans-serif;letter-spacing:.05em}
+.ov .hd span{display:block;color:var(--muted);font-size:12px}
+.ov ol{list-style:none}
+.ov li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid rgba(120,160,255,.07);font-size:14px}
+.ov li .r{font-family:Orbitron,Inter,system-ui,sans-serif;font-weight:700;width:30px;color:var(--muted)}
+.ov li:nth-child(1) .r{color:var(--gold)} .ov li:nth-child(2) .r{color:var(--silver)} .ov li:nth-child(3) .r{color:var(--bronze)}
+.ov li .n{flex:1;font-weight:600}
+.ov li .s{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;color:var(--c)}
+
+/* buttons & inputs */
+.btn{font:600 14px Inter;color:#fff;border:0;border-radius:11px;padding:10px 16px;cursor:pointer;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 6px 24px -8px var(--violet);transition:.15s;white-space:nowrap}
+.btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
+.btn.ghost{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--text)}
+.btn.danger{background:transparent;color:var(--red);box-shadow:inset 0 0 0 1px rgba(255,84,112,.35)}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+input,select{font:500 14px Inter;color:var(--text);background:rgba(5,8,16,.7);border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:none;width:100%;transition:.15s}
+input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,228,255,.15)}
+select option{background:#0b1020}
+label.f{display:block;font-size:12px;color:var(--muted);letter-spacing:.06em;margin-bottom:6px}
+.edit td{padding:9px 8px}
+.edit input,.edit select{padding:8px 9px;font-size:13px}
+.edit input[type=number]{width:74px}
+.edit .tin{min-width:110px}
+.parsed{font-size:11px;color:var(--muted);margin-top:4px;font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;min-height:14px}
+.parsed.bad{color:var(--red)} .parsed.ok{color:var(--green)}
+.rowbtns{display:flex;gap:6px;justify-content:flex-end}
+.dirty{box-shadow:inset 3px 0 0 var(--amber)}
+.row-form{display:grid;grid-template-columns:3fr auto;gap:12px;align-items:end;padding:18px 22px}
+.settings{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:12px;align-items:end;padding:18px 22px}
+.help{padding:0 22px 18px;color:var(--muted);font-size:13px;line-height:1.6}
+.help code{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;color:var(--cyan);background:rgba(34,228,255,.08);padding:1px 6px;border-radius:5px}
+.whobar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:14px}
+.admin-grid{display:grid;gap:20px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(30px);background:var(--panel2);border:1px solid var(--line);padding:12px 18px;border-radius:12px;opacity:0;transition:.3s;z-index:50;font-weight:500;backdrop-filter:blur(10px);pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{border-color:rgba(255,84,112,.5);color:#ffc2cd}
+.lock{padding:60px 24px;text-align:center}
+.lock svg{width:56px;height:56px;margin-bottom:16px;color:var(--violet)}
+.lock h3{font-family:Orbitron,Inter,system-ui,sans-serif;letter-spacing:.08em;margin-bottom:10px}
+.lock p{color:var(--muted);max-width:520px;margin:0 auto 20px;line-height:1.6}
+
+/* TV MODE */
+body.tv{overflow:hidden;cursor:none}
+body.tv .wrap{max-width:none;height:100vh;padding:2.6vh 3vw;display:flex;flex-direction:column}
+body.tv header.top{margin-bottom:2vh}
+body.tv nav.tabs, body.tv .cats, body.tv .stats, body.tv .note, body.tv .demo{display:none}
+body.tv .brand h1{font-size:4.6vh}
+body.tv .brand .sub{font-size:1.5vh}
+body.tv .logo{width:6.6vh;height:6.6vh}
+.tvbar{display:none;align-items:center;gap:2vw}
+body.tv .tvbar{display:flex}
+.clock{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-weight:700;font-size:4vh;color:#fff}
+body.tv .live{font-size:1.7vh}
+body.tv .cathead{margin-bottom:2vh}
+body.tv .cathead .ic{width:6vh;height:6vh} body.tv .cathead .ic svg{width:3.4vh;height:3.4vh}
+body.tv .cathead h2{font-size:3.8vh}
+body.tv .cathead p{font-size:1.7vh}
+body.tv .podium{margin-bottom:2.2vh;gap:1.6vw}
+body.tv .pod{padding:2.2vh 1.5vw}
+body.tv .pod.p1{padding:3.2vh 1.5vw}
+body.tv .pod .medal{width:4.8vh;height:4.8vh;font-size:2vh}
+body.tv .pod .tid{font-size:3.8vh}
+body.tv .pod .ft{font-size:5vh}
+body.tv .pod .meta{font-size:1.7vh}
+body.tv .card{flex:1;min-height:0;display:flex;flex-direction:column}
+body.tv .card h3{font-size:1.8vh;padding:1.5vh 1.6vw}
+body.tv .card h3 .hint{font-size:1.6vh}
+body.tv .tablebox{flex:1;min-height:0;overflow:hidden}
+body.tv th{font-size:1.4vh;padding:1.1vh 1.2vw}
+body.tv td{font-size:2.2vh;padding:1.15vh 1.2vw}
+body.tv .final{font-size:2.6vh}
+body.tv .best b{font-size:2.2vh}
+body.tv .best em{font-size:1.2vh}
+body.tv .pill{font-size:1.5vh;padding:.6vh 1vw}
+.catdots{display:flex;gap:1vw;align-items:center}
+.catdots span{font-size:1.5vh;color:var(--muted);font-weight:600;letter-spacing:.06em;padding:.5vh .9vw;border-radius:999px;border:1px solid var(--line)}
+.catdots span.on{color:#fff;border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.pager{display:flex;gap:6px}
+.pager i{width:22px;height:5px;border-radius:3px;background:var(--line)}
+.pager i.on{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.progress{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:1.2vh}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));width:0}
+.foot{text-align:center;padding:0 0 26px;font-size:12px}
+.foot a{color:rgba(138,150,184,.45);text-decoration:none}
+.foot a:hover{color:var(--muted)}
+body.tv .foot{display:none}
+.adm-list{padding:6px 22px 18px}
+.adm-list li{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(120,160,255,.07);font-size:14px}
+.adm-list li:first-child{border-top:0}
+.tag{font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 8px;border-radius:6px;margin-left:8px}
+.tag.own{color:var(--gold);background:rgba(255,210,94,.12)}
+.tag.adm{color:var(--cyan);background:rgba(34,228,255,.1)}
+.fsbtn{position:fixed;right:20px;bottom:20px;z-index:40}
+body.tv.fs .fsbtn{display:none}
+.page-anim{animation:pagein .6s ease}
+@keyframes pagein{from{opacity:0;transform:translateY(12px)}}
+
+@media (max-width:820px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .podium{grid-template-columns:1fr}
+  .pod.p1{order:-1}
+  .overview{grid-template-columns:1fr}
+  .hide-sm{display:none}
+  .row-form,.settings{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="bg"><div class="grid"></div><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22e4ff"/><stop offset="1" stop-color="#8b5cff"/></linearGradient></defs>
+        <rect x="6" y="6" width="52" height="52" rx="14" fill="none" stroke="url(#lg)" stroke-width="3"/>
+        <rect x="17" y="20" width="30" height="22" rx="6" fill="url(#lg)" opacity=".9"/>
+        <circle cx="26" cy="31" r="3.6" fill="#05070d"/><circle cx="38" cy="31" r="3.6" fill="#05070d"/>
+        <line x1="32" y1="20" x2="32" y2="13" stroke="url(#lg)" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="11" r="3" fill="#ff3d9a"/>
+        <rect x="22" y="45" width="20" height="4" rx="2" fill="url(#lg)"/>
+      </svg>
+      <div>
+        <h1 id="evTitle">ROBOCON</h1>
+        <div class="sub" id="evSub">Hosted by TIPS Kochi School</div>
+      </div>
+    </div>
+    <nav class="tabs">
+      <a href="#board" data-v="board">Scoreboard</a>
+      <a href="#tv" data-v="tv">TV display</a>
+      <a href="#admin" data-v="admin" id="adminTab" style="display:none">Admin</a>
+    </nav>
+    <div class="tvbar"><div class="catdots" id="catDots"></div><span class="live" id="liveTv"><i></i>LIVE</span><span class="clock" id="clock">--:--</span></div>
+  </header>
+  <div id="demoBar"></div>
+  <main id="view"></main>
+</div>
+<footer class="foot" id="foot"><a href="#admin" id="staffLink">Staff sign-in</a></footer>
+<button class="btn fsbtn" id="fsBtn" style="display:none">Go fullscreen</button>
+<div class="toast" id="toast"></div>
+
+<script src="firebase-config.js"></script>
+<script type="module">
+/* =====================================================================
+   CATEGORIES — each has its own scoring type
+   time   : two timed attempts, best one counts, + penalty seconds. Lowest wins.
+   points : judges' score minus penalty points. Highest wins.
+   league : wins / draws / losses / goals. 3 pts win, 1 draw. Highest wins.
+   ===================================================================== */
+const ICONS = {
+  build:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>`,
+  soccer:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/><path d="M12 3v4M21 10l-5 0M18 19l-3.5-4.5M6 19l3.5-4.5M3 10h5"/></svg>`,
+  race:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>`
+};
+const CATS = [
+  {id:"build",     name:"Build Your Robot",     short:"Build",      tag:"Judged · highest score wins", type:"points", icon:"build",  color:"#ffc43d"},
+  {id:"soccer-jr", name:"Robo Soccer — Junior", short:"Soccer Jr",  tag:"League · 3 pts win, 1 draw",  type:"league", icon:"soccer", color:"#2cf59a"},
+  {id:"soccer-sr", name:"Robo Soccer — Senior", short:"Soccer Sr",  tag:"League · 3 pts win, 1 draw",  type:"league", icon:"soccer", color:"#ff3d9a"},
+  {id:"race",      name:"Robo Race",            short:"Race",       tag:"Timed · fastest wins",        type:"time",   icon:"race",   color:"#22e4ff"},
+];
+const STATUSES = {
+  time:   ["Not started","Attempt 1 done","Attempt 2 done","Finished"],
+  points: ["Not judged","Judging","Judged"],
+  league: ["Not started","Playing","Qualified","Eliminated"],
+};
+const statusClass = (type,s) => { if (s==="Eliminated") return "sx"; const i=STATUSES[type].indexOf(s); return type==="points" ? ["s0","s1","s3"][i]||"s0" : type==="league" ? ["s0","s1","s3"][i]||"s0" : "s"+Math.max(0,i); };
+const DEFAULT_CFG = {title:"ROBOCON", subtitle:"Hosted by TIPS Kochi School", penaltySec:5};
+
+/* ---------- state ---------- */
+let backend = null, me = null, isAdmin = false, isOwner = false, adminList = [], unsubAdmins = null;
+let teams = [], cfg = {...DEFAULT_CFG};
+let loaded = false, connected = false;
+let view = "board", cat = null;           // cat = category id, or null for overview
+let tvPinned = null, tvCatIdx = 0, tvPage = 0, tvTimer = null, tvStart = 0;
+let adminCat = CATS[0].id;
+const prevSig = {}, drafts = {};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const catById = id => CATS.find(c=>c.id===id);
+const OWNER_EMAILS = (window.OWNER_EMAILS||[]).map(e=>String(e).trim().toLowerCase());
+const EMAIL_RE = /^[^\s@\/]+@[^\s@\/]+\.[^\s@\/]+$/;
+
+/* ---------- time + scoring ---------- */
+function parseTime(raw){
+  if (raw==null) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return null;
+  let m = s.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/);
+  if (m) return +m[1]*60 + +m[2];
+  if (/^\d+(\.\d+)?$/.test(s)) return +s;
+  const min = s.match(/(\d+(?:\.\d+)?)\s*m(?!s)/), sec = s.match(/(\d+(?:\.\d+)?)\s*s/);
+  if (!min && !sec) return NaN;
+  return (min ? +min[1]*60 : 0) + (sec ? +sec[1] : 0);
+}
+const r2 = n => Math.round(n*100)/100;
+const fmtSec = n => (n==null||isNaN(n)) ? "—" : (Number.isInteger(r2(n)) ? r2(n) : r2(n).toFixed(2).replace(/0$/,"")) + "s";
+const fmtNum = n => (n==null||isNaN(n)) ? "—" : String(r2(n));
+const int0 = v => Math.max(0, Math.floor(+v || 0));
+const num0 = v => { const n = +v; return isFinite(n) ? r2(n) : 0; };
+
+function compute(t, type){
+  if (type==="time"){
+    const a1 = typeof t.a1==="number"?t.a1:null, a2 = typeof t.a2==="number"?t.a2:null;
+    let best=null, which=null;
+    if (a1!=null && (a2==null || a1<=a2)) {best=a1;which=1;} else if (a2!=null){best=a2;which=2;}
+    const pens = int0(t.penalties), final = best==null?null:r2(best + pens*(+cfg.penaltySec||0));
+    return {a1,a2,best,which,pens,final, score:final, has:final!=null};
+  }
+  if (type==="points"){
+    const has = typeof t.score==="number";
+    const pens = num0(t.penalties), final = has ? r2(t.score - pens) : null;
+    return {raw:has?t.score:null, pens, final, score:final, has};
+  }
+  // league
+  const w=int0(t.w), d=int0(t.d), l=int0(t.l), gf=int0(t.gf), ga=int0(t.ga), pens=int0(t.penalties);
+  const played=w+d+l, pts=3*w+d-pens;
+  return {w,d,l,gf,ga,gd:gf-ga,pens,played,pts, final:pts, score:pts, has:played>0};
+}
+function ranked(catId){
+  const c = catById(catId), type = c.type;
+  const list = teams.filter(t=>t.category===catId).map(t=>({...t, c:compute(t,type)}));
+  const byId = (x,y) => String(x.teamId).localeCompare(String(y.teamId),undefined,{numeric:true});
+  list.sort((x,y)=>{
+    if (x.c.has && y.c.has){
+      if (type==="time")   return x.c.final-y.c.final || x.c.best-y.c.best || byId(x,y);
+      if (type==="points") return y.c.final-x.c.final || byId(x,y);
+      return y.c.pts-x.c.pts || y.c.gd-x.c.gd || y.c.gf-x.c.gf || byId(x,y);
+    }
+    if (x.c.has) return -1; if (y.c.has) return 1;
+    return byId(x,y);
+  });
+  let r=0; list.forEach(t=>{ t.rank = t.c.has ? ++r : null; });
+  return list;
+}
+const sigOf = t => JSON.stringify([t.c.final,t.c.pens,t.status,t.a1,t.a2,t.w,t.d,t.l,t.gf,t.ga]);
+
+/* ---------- table pieces per type ---------- */
+function headHTML(type){
+  if (type==="time")   return `<tr><th>Rank</th><th>Team ID</th><th>Status</th><th>Attempt 1</th><th>Attempt 2</th><th>Penalties</th><th>Final time</th></tr>`;
+  if (type==="points") return `<tr><th>Rank</th><th>Team ID</th><th>Status</th><th>Judges' score</th><th>Penalties</th><th>Final score</th></tr>`;
+  return `<tr><th>Rank</th><th>Team ID</th><th>Status</th><th>P</th><th>W</th><th>D</th><th>L</th><th class="hide-sm">GF</th><th class="hide-sm">GA</th><th>GD</th><th>Pen</th><th>Points</th></tr>`;
+}
+function rowHTML(t, type){
+  const c=t.c, sig=sigOf(t), flash = prevSig[t.id]!==undefined && prevSig[t.id]!==sig ? " flash":"";
+  prevSig[t.id]=sig;
+  const rk = `<td class="rank ${t.rank&&t.rank<=3?"r"+t.rank:""}">${t.rank?String(t.rank).padStart(2,"0"):"–"}</td>`;
+  const tid = `<td class="team">${esc(t.teamId)}</td>`;
+  const st = `<td><span class="pill ${statusClass(type,t.status)}">${esc(t.status||STATUSES[type][0])}</span></td>`;
+  const dash = `<span class="dim">—</span>`;
+  if (type==="time"){
+    const att=(v,n)=> v==null?dash : c.which===n ? `<span class="best"><b>${fmtSec(v)}</b><em>ATTEMPT ${n} · BEST</em></span>` : `<span class="num">${fmtSec(v)}</span>`;
+    return `<tr class="${flash}">${rk}${tid}${st}<td>${att(c.a1,1)}</td><td>${att(c.a2,2)}</td>
+      <td>${c.pens?`<span class="pen">+${c.pens}</span> <span class="dim hide-sm">(${fmtSec(c.pens*(+cfg.penaltySec||0))})</span>`:`<span class="dim">0</span>`}</td>
+      <td class="final">${c.has?fmtSec(c.final):dash}</td></tr>`;
+  }
+  if (type==="points"){
+    return `<tr class="${flash}">${rk}${tid}${st}<td class="num">${c.has?fmtNum(c.raw):dash}</td>
+      <td>${c.pens?`<span class="pen">−${fmtNum(c.pens)}</span>`:`<span class="dim">0</span>`}</td>
+      <td class="final hl">${c.has?fmtNum(c.final):dash}</td></tr>`;
+  }
+  return `<tr class="${flash}">${rk}${tid}${st}<td class="num">${c.played}</td><td class="num">${c.w}</td><td class="num">${c.d}</td><td class="num">${c.l}</td>
+    <td class="num hide-sm">${c.gf}</td><td class="num hide-sm">${c.ga}</td><td class="num">${c.gd>0?"+":""}${c.gd}</td>
+    <td>${c.pens?`<span class="pen">−${c.pens}</span>`:`<span class="dim">0</span>`}</td><td class="final hl">${c.has?c.pts:dash}</td></tr>`;
+}
+function scoreText(t, type){ return type==="time" ? fmtSec(t.c.final) : type==="points" ? fmtNum(t.c.final)+"<small>pts</small>" : t.c.pts+"<small>pts</small>"; }
+function metaText(t, type){
+  const c=t.c;
+  if (type==="time") return `Best: Attempt ${c.which} · ${fmtSec(c.best)}${c.pens?` · ${c.pens} penalt${c.pens>1?"ies":"y"}`:""}`;
+  if (type==="points") return `Judges ${fmtNum(c.raw)}${c.pens?` · −${fmtNum(c.pens)} penalty`:""}`;
+  return `W${c.w} D${c.d} L${c.l} · GD ${c.gd>0?"+":""}${c.gd}`;
+}
+function podiumHTML(list, type){
+  const top = list.filter(t=>t.rank!=null).slice(0,3);
+  const card=(t,p)=> t ? `<div class="pod p${p}"><div class="medal">${p}</div><div class="tid">${esc(t.teamId)}</div><div class="ft">${scoreText(t,type)}</div><div class="meta">${metaText(t,type)}</div></div>`
+    : `<div class="pod p${p} empty"><div class="medal">${p}</div><div class="tid">Awaiting results</div><div class="meta">&nbsp;</div></div>`;
+  return `<section class="podium">${card(top[1],2)}${card(top[0],1)}${card(top[2],3)}</section>`;
+}
+function rulesHint(type){
+  if (type==="time") return `Final time = best attempt + ${+cfg.penaltySec||0}s per penalty · lowest wins`;
+  if (type==="points") return `Final score = judges' score − penalty points · highest wins`;
+  return `3 pts win · 1 pt draw · minus penalty pts · ties split by goal difference, then goals scored`;
+}
+function emptyState(){
+  if (!loaded) return `<div class="empty-state"><b>Connecting…</b>Loading live scores.</div>`;
+  return `<div class="empty-state"><b>No teams yet</b>Teams appear here as soon as an admin adds them.</div>`;
+}
+function catHeadHTML(c){ return `<div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>${esc(c.tag)}</p></div></div>`; }
+function setAccent(color){ document.documentElement.style.setProperty("--accent", color || "#22e4ff"); }
+
+/* ---------- views ---------- */
+function catChips(active, prefix){
+  return `<nav class="cats">
+    <a class="cat ${!active?"on":""}" href="#${prefix}" style="--c:#8b5cff"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><span>All categories<small>Overview</small></span></a>
+    ${CATS.map(c=>`<a class="cat ${active===c.id?"on":""}" href="#${prefix}-${c.id}" style="--c:${c.color}"><span class="ic">${ICONS[c.icon]}</span><span>${esc(c.short)}<small>${teams.filter(t=>t.category===c.id).length} teams</small></span></a>`).join("")}
+  </nav>`;
+}
+function renderOverview(){
+  setAccent("#22e4ff");
+  const fin = teams.filter(t=>["Finished","Judged","Qualified","Eliminated"].includes(t.status)).length;
+  $("#view").innerHTML = `
+    ${catChips(null,"board")}
+    <section class="stats">
+      <div class="stat"><div class="k">Categories</div><div class="v">${CATS.length}</div></div>
+      <div class="stat"><div class="k">Teams</div><div class="v">${teams.length}</div></div>
+      <div class="stat"><div class="k">Results in</div><div class="v">${fin}<small> / ${teams.length}</small></div></div>
+      <div class="stat"><div class="k">Status</div><div class="v" style="font-size:16px;margin-top:14px"><span class="live" id="liveBoard"><i></i>LIVE</span></div></div>
+    </section>
+    <section class="overview">
+      ${CATS.map(c=>{ const l=ranked(c.id).filter(t=>t.rank).slice(0,5);
+        return `<a class="ov" href="#board-${c.id}" style="--c:${c.color}">
+          <div class="hd"><div class="ic">${ICONS[c.icon]}</div><div><b>${esc(c.name)}</b><span>${esc(c.tag)}</span></div></div>
+          ${l.length?`<ol>${l.map(t=>`<li><span class="r">${t.rank}</span><span class="n">${esc(t.teamId)}</span><span class="s">${scoreText(t,c.type).replace(/<small>pts<\/small>/," pts")}</span></li>`).join("")}</ol>`
+                   :`<div class="dim" style="padding:14px 0;font-size:14px">${loaded?"No results yet":"Loading…"}</div>`}
+        </a>`;}).join("")}
+    </section>
+    <p class="note">Tap a category for its full leaderboard. Scores update by themselves.</p>`;
+  setLive();
+}
+function renderCategory(catId){
+  const c = catById(catId); setAccent(c.color);
+  const list = ranked(catId);
+  $("#view").innerHTML = `
+    ${catChips(catId,"board")}
+    ${catHeadHTML(c)}
+    ${podiumHTML(list,c.type)}
+    <section class="card">
+      <h3>Leaderboard <span class="hint">${rulesHint(c.type)}</span></h3>
+      ${list.length?`<div class="scroll"><table><thead>${headHTML(c.type)}</thead><tbody>${list.map(t=>rowHTML(t,c.type)).join("")}</tbody></table></div>`:emptyState()}
+    </section>
+    <p class="note"><span class="live" id="liveBoard"><i></i>LIVE</span> &nbsp;Scores update by themselves. Use <a href="#tv-${c.id}">TV display</a> for the big screen.</p>`;
+  setLive();
+}
+
+/* TV */
+const TV_PAGE_MS = 9000;
+function tvCats(){ return tvPinned ? [tvPinned] : CATS.map(c=>c.id); }
+function tvRowsPerPage(){
+  const box = $("#tvBox"); if (!box) return 8;
+  return Math.max(3, Math.floor((box.clientHeight - innerHeight*0.055) / (innerHeight*0.066)));
+}
+function renderTV(){
+  const ids = tvCats(); if (tvCatIdx >= ids.length) tvCatIdx = 0;
+  const c = catById(ids[tvCatIdx]); setAccent(c.color);
+  $("#catDots").innerHTML = tvPinned ? "" : CATS.map(x=>`<span class="${x.id===c.id?"on":""}">${esc(x.short)}</span>`).join("");
+  const list = ranked(c.id);
+  $("#view").innerHTML = `
+    ${catHeadHTML(c)}
+    ${podiumHTML(list,c.type)}
+    <section class="card">
+      <h3>Leaderboard <span class="hint" id="tvHint"></span></h3>
+      <div class="tablebox" id="tvBox">${list.length?"":emptyState()}</div>
+      <div class="progress"><i id="tvProg"></i></div>
+    </section>`;
+  let pages = 1;
+  if (list.length){
+    const per = tvRowsPerPage(); pages = Math.max(1, Math.ceil(list.length/per));
+    if (tvPage >= pages) tvPage = 0;
+    $("#tvBox").innerHTML = `<table class="page-anim"><thead>${headHTML(c.type)}</thead><tbody>${list.slice(tvPage*per,tvPage*per+per).map(t=>rowHTML(t,c.type)).join("")}</tbody></table>`;
+  }
+  $("#tvHint").innerHTML = pages>1 ? `<span class="pager">${Array.from({length:pages},(_,i)=>`<i class="${i===tvPage?"on":""}"></i>`).join("")}</span>` : rulesHint(c.type);
+  renderTV.pages = pages;
+  animateProgress();
+  setLive();
+}
+function animateProgress(){
+  const el = $("#tvProg"); if (!el) return;
+  const left = Math.max(0, TV_PAGE_MS - (Date.now()-tvStart));
+  el.style.transition = "none"; el.style.width = (100*(1-left/TV_PAGE_MS))+"%";
+  requestAnimationFrame(()=>{ el.style.transition = `width ${left}ms linear`; el.style.width = "100%"; });
+}
+function tvAdvance(){
+  tvStart = Date.now();
+  if (tvPage+1 < (renderTV.pages||1)) tvPage++;
+  else { tvPage = 0; tvCatIdx = (tvCatIdx+1) % tvCats().length; }
+  renderTV();
+}
+function startTV(){ clearInterval(tvTimer); tvStart = Date.now(); tvTimer = setInterval(()=>{ if(view==="tv") tvAdvance(); }, TV_PAGE_MS); }
+
+/* ADMIN */
+function lockHTML(title, msg, btn){
+  return `<section class="card"><div class="lock">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    <h3>${title}</h3><p>${msg}</p>${btn||""}</div></section>`;
+}
+function draftOf(t){
+  if (drafts[t.id]) return drafts[t.id];
+  return {teamId:t.teamId??"", status:t.status||STATUSES[catById(t.category).type][0],
+    a1:t.a1raw ?? (t.a1??""), a2:t.a2raw ?? (t.a2??""), penalties:t.penalties??0,
+    score:t.score??"", w:t.w??0, d:t.d??0, l:t.l??0, gf:t.gf??0, ga:t.ga??0};
+}
+function parsedLabel(v){ const p=parseTime(v); if (p===null) return {cls:"",txt:""}; if (isNaN(p)) return {cls:"bad",txt:"can't read this"}; return {cls:"ok",txt:"= "+fmtSec(p)}; }
+function draftToTeam(d){ return {a1:parseTime(d.a1), a2:parseTime(d.a2), penalties:d.penalties, score: d.score===""||d.score==null?null:+d.score, w:d.w,d:d.d,l:d.l,gf:d.gf,ga:d.ga}; }
+function previewHTML(d, type){
+  const c = compute(draftToTeam(d), type);
+  if (type==="time") return c.which?`<span class="best"><b>${fmtSec(c.final)}</b><em>ATTEMPT ${c.which} BEST</em></span>`:`<span class="dim">—</span>`;
+  if (type==="points") return c.has?`<span class="best"><b>${fmtNum(c.final)}</b><em>FINAL</em></span>`:`<span class="dim">—</span>`;
+  return `<span class="best"><b>${c.pts}</b><em>POINTS</em></span>`;
+}
+function adminRowHTML(t, type){
+  const d = draftOf(t), id = esc(t.id);
+  const n = (f,step="1") => `<input data-f="${f}" type="number" min="0" step="${step}" value="${esc(d[f])}">`;
+  let mid = "";
+  if (type==="time"){ const p1=parsedLabel(d.a1), p2=parsedLabel(d.a2);
+    mid = `<td><input data-f="a1" value="${esc(d.a1)}" placeholder="1 min 20 sec"><div class="parsed ${p1.cls}">${p1.txt}</div></td>
+           <td><input data-f="a2" value="${esc(d.a2)}" placeholder="1 min 05 sec"><div class="parsed ${p2.cls}">${p2.txt}</div></td><td>${n("penalties")}</td>`; }
+  else if (type==="points") mid = `<td>${n("score","0.5")}</td><td>${n("penalties","0.5")}</td>`;
+  else mid = ["w","d","l","gf","ga","penalties"].map(f=>`<td>${n(f)}</td>`).join("");
+  return `<tr data-id="${id}" class="${drafts[t.id]?"dirty":""}">
+    <td><input class="tin" data-f="teamId" value="${esc(d.teamId)}"></td>
+    <td><select data-f="status">${STATUSES[type].map(s=>`<option ${s===d.status?"selected":""}>${s}</option>`).join("")}</select></td>
+    ${mid}<td class="prev">${previewHTML(d,type)}</td>
+    <td><div class="rowbtns"><button class="btn sm" data-act="save">Save</button><button class="btn sm danger" data-act="del">Delete</button></div></td></tr>`;
+}
+function adminHeadHTML(type){
+  const a = type==="time" ? `<th>Attempt 1</th><th>Attempt 2</th><th>Penalties</th><th>Final</th>`
+          : type==="points" ? `<th>Judges' score</th><th>Penalty pts</th><th>Final</th>`
+          : `<th>Won</th><th>Drawn</th><th>Lost</th><th>Goals for</th><th>Goals against</th><th>Penalty pts</th><th>Points</th>`;
+  return `<tr><th>Team ID</th><th>Status</th>${a}<th></th></tr>`;
+}
+function renderAdmin(){
+  setAccent(catById(adminCat).color);
+  if (!backend){ $("#view").innerHTML = `<section class="card">${emptyState()}</section>`; return; }
+  if (!me){ $("#view").innerHTML = lockHTML("Admin sign-in", backend.kind==="demo" ? "Demo mode: sign in to try the admin page (you'll be signed in as an owner). Nothing is shared until Firebase is connected." : "Sign in with your Google account. Only approved admin emails can enter scores.", `<button class="btn" id="signIn">${backend.kind==="demo"?"Sign in (demo)":"Sign in with Google"}</button>`); bindSignIn(); return; }
+  if (!isAdmin){ $("#view").innerHTML = lockHTML("Not an admin", `You're signed in as <b>${esc(me.email)}</b>, which doesn't have admin access. Ask an organiser to add this email.`, `<button class="btn ghost" id="signOut">Sign out</button>`); bindSignOut(); return; }
+  const c = catById(adminCat);
+  const list = teams.filter(t=>t.category===adminCat).sort((a,b)=>String(a.teamId).localeCompare(String(b.teamId),undefined,{numeric:true}));
+  $("#view").innerHTML = `
+  <div class="whobar"><span>Signed in as <b>${esc(me.email)}</b>${backend.kind==="demo"?" (demo)":""}</span><button class="btn sm ghost" id="signOut">Sign out</button></div>
+  <nav class="cats">${CATS.map(x=>`<a class="cat ${x.id===adminCat?"on":""}" href="#admin" data-cat="${x.id}" style="--c:${x.color}"><span class="ic">${ICONS[x.icon]}</span><span>${esc(x.short)}<small>${teams.filter(t=>t.category===x.id).length} teams</small></span></a>`).join("")}</nav>
+  <div class="admin-grid">
+    <section class="card">
+      <h3>Add teams to ${esc(c.name)} <span class="hint">Separate several IDs with commas</span></h3>
+      <form class="row-form" id="addForm"><div><label class="f">Team ID(s)</label><input id="newIds" placeholder="e.g. T01, T02, T03" autocomplete="off"></div><button class="btn" type="submit">Add</button></form>
+    </section>
+    <section class="card">
+      <h3>${esc(c.name)} scores <span class="hint">${c.type==="time"?"Type times like <b>1 min 20 sec</b>, <b>1m 20s</b>, <b>1:20</b> or <b>80</b>":rulesHint(c.type)}</span></h3>
+      ${list.length?`<div class="scroll"><table class="edit"><thead>${adminHeadHTML(c.type)}</thead><tbody>${list.map(t=>adminRowHTML(t,c.type)).join("")}</tbody></table></div>`
+                  :`<div class="empty-state"><b>No teams in this category</b>Add team IDs above.</div>`}
+    </section>
+    <section class="card">
+      <h3>Event settings</h3>
+      <form class="settings" id="cfgForm">
+        <div><label class="f">Event title</label><input id="cTitle" value="${esc(cfg.title)}"></div>
+        <div><label class="f">Subtitle</label><input id="cSub" value="${esc(cfg.subtitle)}"></div>
+        <div><label class="f">Robo Race: seconds per penalty</label><input id="cPen" type="number" min="0" step="0.5" value="${esc(cfg.penaltySec)}"></div>
+        <button class="btn" type="submit">Save settings</button>
+      </form>
+    </section>
+    ${isOwner ? `<section class="card">
+      <h3>Manage admins <span class="hint">Admins can enter scores. Only owners can add or remove admins.</span></h3>
+      <form class="row-form" id="admForm"><div><label class="f">Google account email</label><input id="admEmail" type="email" placeholder="name@gmail.com" autocomplete="off"></div><button class="btn" type="submit">Add admin</button></form>
+      <ul class="adm-list">
+        ${OWNER_EMAILS.map(e=>`<li><span>${esc(e)}<span class="tag own">OWNER</span></span><span class="dim" style="font-size:12px">Built in</span></li>`).join("")}
+        ${adminList.filter(e=>!OWNER_EMAILS.includes(e)).map(e=>`<li><span>${esc(e)}<span class="tag adm">ADMIN</span></span><button class="btn sm danger" data-rm="${esc(e)}">Remove</button></li>`).join("")}
+      </ul>
+    </section>` : ""}
+  </div>`;
+  bindAdmin();
+}
+
+/* ---------- admin actions ---------- */
+function toast(msg, err){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); clearTimeout(toast._t); toast._t=setTimeout(()=>t.className="toast",2600); }
+function writeErr(e){
+  console.error(e);
+  const code = e && (e.code||"");
+  if (String(code).includes("permission")) toast("Not allowed: this account doesn't have admin access.", true);
+  else toast("Couldn't save. Check the internet connection and try again.", true);
+}
+function bindSignIn(){ const b=$("#signIn"); b && b.addEventListener("click", async()=>{ try{ await backend.signIn(); }catch(e){ if(!String(e.code||"").includes("popup-closed")) toast("Sign-in failed: "+(e.code||e.message), true);} }); }
+function bindSignOut(){ const b=$("#signOut"); b && b.addEventListener("click", ()=>backend.signOut()); }
+function bindAdmin(){
+  bindSignOut();
+  document.querySelectorAll(".cats [data-cat]").forEach(a=>a.addEventListener("click", e=>{ e.preventDefault(); adminCat=a.dataset.cat; renderAdmin(); }));
+  const type = catById(adminCat).type;
+  $("#addForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const ids = $("#newIds").value.split(",").map(s=>s.trim()).filter(Boolean);
+    const have = new Set(teams.filter(t=>t.category===adminCat).map(t=>String(t.teamId).toLowerCase()));
+    const fresh = [...new Set(ids)].filter(i=>!have.has(i.toLowerCase()));
+    if (!fresh.length){ toast(ids.length?"Those teams are already in this category.":"Type a team ID first."); return; }
+    const btn = e.submitter || $("#addForm button"); btn.disabled = true;
+    try{
+      for (const id of fresh) await backend.addTeam({category:adminCat, teamId:id, status:STATUSES[type][0], penalties:0, updatedAt:Date.now()});
+      toast(`Added ${fresh.length} team${fresh.length>1?"s":""}`); $("#newIds").value="";
+    }catch(err){ writeErr(err); }
+    btn.disabled = false;
+  });
+  document.querySelectorAll("table.edit tbody tr").forEach(tr=>{
+    const id = tr.dataset.id, t = teams.find(x=>x.id===id); if (!t) return;
+    const onEdit = e => {
+      const f = e.target.dataset.f; if (!f) return;
+      const d = drafts[id] || (drafts[id] = {...draftOf(t)});
+      d[f] = e.target.value; tr.classList.add("dirty");
+      if (f==="a1"||f==="a2"){ const p=parsedLabel(d[f]), el=e.target.nextElementSibling; el.className="parsed "+p.cls; el.textContent=p.txt; }
+      tr.querySelector(".prev").innerHTML = previewHTML(d,type);
+    };
+    tr.addEventListener("input", onEdit); tr.addEventListener("change", onEdit);
+    tr.querySelector('[data-act="save"]').addEventListener("click", async ev=>{
+      const d = drafts[id] || draftOf(t), tid = String(d.teamId).trim();
+      if (!tid){ toast("Team ID can't be empty.", true); return; }
+      const data = {category:t.category, teamId:tid, status:d.status, updatedAt:Date.now()};
+      if (type==="time"){
+        const a1=parseTime(d.a1), a2=parseTime(d.a2);
+        if (Number.isNaN(a1)||Number.isNaN(a2)){ toast("A time couldn't be read. Try a format like 1 min 20 sec.", true); return; }
+        Object.assign(data,{a1:a1==null?null:r2(a1), a2:a2==null?null:r2(a2), a1raw:String(d.a1??""), a2raw:String(d.a2??""), penalties:int0(d.penalties)});
+      } else if (type==="points"){
+        Object.assign(data,{score: d.score===""||d.score==null ? null : num0(d.score), penalties:Math.max(0,num0(d.penalties))});
+      } else {
+        Object.assign(data,{w:int0(d.w), d:int0(d.d), l:int0(d.l), gf:int0(d.gf), ga:int0(d.ga), penalties:int0(d.penalties)});
+      }
+      const btn = ev.currentTarget; btn.disabled = true;
+      try{ await backend.saveTeam(id, data); delete drafts[id]; toast(`Saved ${tid}`); renderAdmin(); }
+      catch(err){ writeErr(err); btn.disabled=false; }
+    });
+    let armed=false;
+    tr.querySelector('[data-act="del"]').addEventListener("click", async ev=>{
+      const btn = ev.currentTarget;
+      if (!armed){ armed=true; btn.textContent="Confirm?"; setTimeout(()=>{armed=false; btn.textContent="Delete";},3000); return; }
+      btn.disabled=true;
+      try{ await backend.deleteTeam(id); delete drafts[id]; toast("Team deleted"); }catch(err){ writeErr(err); btn.disabled=false; }
+    });
+  });
+  $("#cfgForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const next = {title:$("#cTitle").value.trim()||DEFAULT_CFG.title, subtitle:$("#cSub").value.trim(), penaltySec:Math.max(0,+$("#cPen").value||0)};
+    try{ await backend.saveCfg(next); toast("Settings saved"); }catch(err){ writeErr(err); }
+  });
+  const af = $("#admForm");
+  af && af.addEventListener("submit", async e=>{
+    e.preventDefault();
+    const em = $("#admEmail").value.trim().toLowerCase();
+    if (!EMAIL_RE.test(em)){ toast("Enter a valid email address.", true); return; }
+    if (OWNER_EMAILS.includes(em) || adminList.includes(em)){ toast("That email already has admin access."); return; }
+    try{ await backend.addAdmin(em, me.email); toast(`${em} is now an admin`); $("#admEmail").value=""; }catch(err){ writeErr(err); }
+  });
+  document.querySelectorAll("[data-rm]").forEach(b=>{ let armed=false; b.addEventListener("click", async()=>{
+    if (!armed){ armed=true; b.textContent="Confirm?"; setTimeout(()=>{armed=false; b.textContent="Remove";},3000); return; }
+    b.disabled=true;
+    try{ await backend.removeAdmin(b.dataset.rm); toast("Admin removed"); }catch(err){ writeErr(err); b.disabled=false; }
+  }); });
+}
+function updateAdminUI(){
+  $("#adminTab").style.display = isAdmin ? "" : "none";
+  $("#foot").style.display = isAdmin ? "none" : "";
+}
+
+/* ---------- routing ---------- */
+function setLive(){
+  ["#liveBoard","#liveTv"].forEach(sel=>{ const el=$(sel); if(!el) return;
+    el.classList.toggle("off", !connected);
+    el.lastChild.textContent = connected ? "LIVE" : (loaded ? "RECONNECTING" : "CONNECTING");
+  });
+}
+function applyCfg(){ $("#evTitle").textContent = cfg.title||DEFAULT_CFG.title; $("#evSub").textContent = cfg.subtitle||""; document.title = (cfg.title||"Robocon")+" · Live Scoreboard"; }
+function render(fromData){
+  document.querySelectorAll("nav.tabs a").forEach(a=>a.classList.toggle("on", a.dataset.v===view));
+  document.body.classList.toggle("tv", view==="tv");
+  $("#fsBtn").style.display = view==="tv" && !document.fullscreenElement ? "" : "none";
+  if (view==="tv") return renderTV();
+  if (view==="admin"){
+    // keep an admin's half-typed edits when someone else saves
+    const a = document.activeElement;
+    if (fromData && a && a.closest && a.closest("table.edit, #addForm, #cfgForm")) return;
+    return renderAdmin();
+  }
+  return cat ? renderCategory(cat) : renderOverview();
+}
+function route(){
+  const h = decodeURIComponent((location.hash||"").slice(1));
+  const known = id => CATS.some(c=>c.id===id);
+  if (h==="tv" || h.startsWith("tv-")){
+    view="tv"; const id=h.slice(3); tvPinned = known(id)?id:null; tvCatIdx=0; tvPage=0; startTV();
+  } else if (h==="admin"){ view="admin"; }
+  else { view="board"; const id=h.startsWith("board-")?h.slice(6):null; cat = known(id)?id:null; }
+  if (view!=="tv") clearInterval(tvTimer);
+  window.scrollTo(0,0);
+  render();
+}
+addEventListener("hashchange", route);
+addEventListener("resize", ()=>{ if(view==="tv") renderTV(); });
+$("#fsBtn").addEventListener("click", async()=>{ try{ await document.documentElement.requestFullscreen(); }catch(e){ toast("Press F11 for fullscreen.", true); } });
+document.addEventListener("fullscreenchange", ()=>{ document.body.classList.toggle("fs", !!document.fullscreenElement); render(); });
+const tick = ()=>{ $("#clock").textContent = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); };
+setInterval(tick, 1000); tick();
+let curT; document.addEventListener("mousemove", ()=>{ if(view!=="tv")return; document.body.style.cursor="default"; clearTimeout(curT); curT=setTimeout(()=>document.body.style.cursor="",2500); });
+// TV safety net: full reload every 30 minutes when online (clears any stuck state on long events)
+setInterval(()=>{ if (view==="tv" && navigator.onLine) location.reload(); }, 30*60*1000);
+
+/* =====================================================================
+   BACKENDS
+   ===================================================================== */
+const FB_VER = "10.12.2", FB = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+async function firebaseBackend(conf){
+  const [app, fs, au] = await Promise.all([import(FB+"firebase-app.js"), import(FB+"firebase-firestore.js"), import(FB+"firebase-auth.js")]);
+  const a = app.initializeApp(conf), db = fs.getFirestore(a), auth = au.getAuth(a);
+  return {
+    kind:"firebase",
+    watchTeams(next, err){ return fs.onSnapshot(fs.collection(db,"teams"), {includeMetadataChanges:true}, s=>next(s.docs.map(d=>({id:d.id,...d.data()})), !s.metadata.fromCache), err); },
+    watchCfg(next){ return fs.onSnapshot(fs.doc(db,"config","event"), s=>next(s.exists()?s.data():{})); },
+    addTeam:d=>fs.addDoc(fs.collection(db,"teams"), d),
+    saveTeam:(id,d)=>fs.setDoc(fs.doc(db,"teams",id), d),
+    deleteTeam:id=>fs.deleteDoc(fs.doc(db,"teams",id)),
+    saveCfg:d=>fs.setDoc(fs.doc(db,"config","event"), d),
+    onAuth:cb=>au.onAuthStateChanged(auth, u=>cb(u?{email:(u.email||"").toLowerCase()}:null)),
+    signIn:()=>au.signInWithPopup(auth, new au.GoogleAuthProvider()),
+    signOut:()=>au.signOut(auth),
+    async isListedAdmin(email){ try{ return (await fs.getDoc(fs.doc(db,"admins",email))).exists(); }catch(e){ return false; } },
+    watchAdmins(next){ return fs.onSnapshot(fs.collection(db,"admins"), s=>next(s.docs.map(d=>d.id)), e=>console.error(e)); },
+    addAdmin:(email,by)=>fs.setDoc(fs.doc(db,"admins",email), {email, addedBy:by, addedAt:Date.now()}),
+    removeAdmin:email=>fs.deleteDoc(fs.doc(db,"admins",email)),
+  };
+}
+function demoBackend(){
+  const KEY="robocon-demo-v1", ch = ("BroadcastChannel" in window) ? new BroadcastChannel(KEY) : null;
+  const subs = new Set(), cfgSubs = new Set(), authSubs = new Set(), admSubs = new Set();
+  const load = ()=>{ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } };
+  let st = load();
+  if (!st){
+    const mk=(category,teamId,x)=>({id:Math.random().toString(36).slice(2,10), category, teamId, penalties:0, ...x});
+    st = {cfg:{...DEFAULT_CFG}, teams:[
+      mk("race","R01",{status:"Finished",a1:80,a2:65,a1raw:"1 min 20 sec",a2raw:"1 min 5 sec",penalties:1}),
+      mk("race","R02",{status:"Finished",a1:72,a2:78,a1raw:"1m 12s",a2raw:"1m 18s"}),
+      mk("race","R03",{status:"Attempt 1 done",a1:90,a1raw:"1:30"}),
+      mk("race","R04",{status:"Not started"}),
+      mk("build","B01",{status:"Judged",score:86,penalties:2}),
+      mk("build","B02",{status:"Judged",score:91}),
+      mk("build","B03",{status:"Judging",score:74}),
+      mk("soccer-jr","J01",{status:"Playing",w:2,d:1,l:0,gf:6,ga:2}),
+      mk("soccer-jr","J02",{status:"Playing",w:1,d:1,l:1,gf:3,ga:3}),
+      mk("soccer-jr","J03",{status:"Eliminated",w:0,d:0,l:3,gf:1,ga:7}),
+      mk("soccer-sr","S01",{status:"Qualified",w:3,d:0,l:0,gf:9,ga:1}),
+      mk("soccer-sr","S02",{status:"Playing",w:1,d:0,l:2,gf:4,ga:5}),
+    ]};
+    try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
+  }
+  let user = null;
+  const emit = ()=>{ subs.forEach(f=>f(st.teams.map(t=>({...t})), true)); cfgSubs.forEach(f=>f({...st.cfg})); admSubs.forEach(f=>f([...(st.admins||[])])); };
+  const save = ()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} ch && ch.postMessage(1); emit(); };
+  ch && (ch.onmessage = ()=>{ st = load() || st; emit(); });
+  addEventListener("storage", e=>{ if(e.key===KEY){ st = load() || st; emit(); } });
+  return {
+    kind:"demo",
+    watchTeams(next){ subs.add(next); setTimeout(()=>next(st.teams.map(t=>({...t})), true), 150); return ()=>subs.delete(next); },
+    watchCfg(next){ cfgSubs.add(next); next({...st.cfg}); return ()=>cfgSubs.delete(next); },
+    async addTeam(d){ st.teams.push({id:Math.random().toString(36).slice(2,10), ...d}); save(); },
+    async saveTeam(id,d){ st.teams = st.teams.map(t=>t.id===id?{id,...d}:t); save(); },
+    async deleteTeam(id){ st.teams = st.teams.filter(t=>t.id!==id); save(); },
+    async saveCfg(d){ st.cfg = {...d}; save(); },
+    onAuth(cb){ authSubs.add(cb); cb(user); },
+    async signIn(){ user = {email:OWNER_EMAILS[0]||"demo@example.com", demo:true}; authSubs.forEach(f=>f(user)); },
+    async signOut(){ user = null; authSubs.forEach(f=>f(user)); },
+    async isListedAdmin(email){ return (st.admins||[]).includes(email); },
+    watchAdmins(next){ admSubs.add(next); next([...(st.admins||[])]); return ()=>admSubs.delete(next); },
+    async addAdmin(email){ st.admins = [...new Set([...(st.admins||[]), email])]; save(); },
+    async removeAdmin(email){ st.admins = (st.admins||[]).filter(e=>e!==email); save(); },
+  };
+}
+
+/* ---------- start ---------- */
+route();
+(async ()=>{
+  const conf = window.FIREBASE_CONFIG || {};
+  const configured = conf.apiKey && conf.apiKey !== "PASTE_HERE" && conf.projectId && conf.projectId !== "PASTE_HERE";
+  try { backend = configured ? await firebaseBackend(conf) : demoBackend(); }
+  catch(e){ console.error(e); $("#demoBar").innerHTML = `<div class="demo">Couldn't connect to Firebase. Check the internet connection and the settings in <b>firebase-config.js</b>.</div>`; loaded=true; render(); return; }
+  if (backend.kind==="demo") $("#demoBar").innerHTML = `<div class="demo"><b>Demo mode.</b> Showing sample teams saved only in this browser. Connect Firebase in <b>firebase-config.js</b> to go live (see README).</div>`;
+  let loadTimer = setTimeout(()=>{ loaded=true; connected=false; render(true); }, 10000);
+  const watch = () => backend.watchTeams((list, server)=>{
+    teams = list; loaded = true;
+    if (server){ connected = true; clearTimeout(loadTimer); } else connected = false;
+    render(true);
+  }, err=>{ console.error(err); connected=false; setLive(); setTimeout(watch, 5000); });
+  watch();
+  backend.watchCfg(d=>{ cfg = {...DEFAULT_CFG, ...d}; applyCfg(); render(true); });
+  backend.onAuth(async u=>{
+    me = u;
+    isOwner = !!u && OWNER_EMAILS.includes(u.email);
+    isAdmin = isOwner || (!!u && await backend.isListedAdmin(u.email));
+    if (unsubAdmins){ unsubAdmins(); unsubAdmins = null; } adminList = [];
+    if (isOwner) unsubAdmins = backend.watchAdmins(list=>{ adminList = list; if (view==="admin") render(true); });
+    updateAdminUI();
+    if (view==="admin") renderAdmin();
+  });
+  addEventListener("online", ()=>{ connected = true; setLive(); });
+  addEventListener("offline", ()=>{ connected = false; setLive(); });
+})();
+</script>
+</body>
+</html>
