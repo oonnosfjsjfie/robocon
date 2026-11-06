@@ -22,11 +22,16 @@ service cloud.firestore {
         || (signedIn() && exists(/databases/$(database)/documents/admins/$(myEmail())));
     }
 
-    // Scores and event settings: everyone can read, only admins can change.
+    // Scores: private. Only admins can read or change them.
     match /teams/{id} {
+      allow read, write: if isAdmin();
+    }
+    // Public board: team IDs, status, penalties and reasons only. Everyone can read.
+    match /public/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
+    // Event settings: everyone can read, only admins can change.
     match /config/{id} {
       allow read: if true;
       allow write: if isAdmin();
