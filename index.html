@@ -293,12 +293,11 @@ const CATS = [
   {id:"soccer-sr", name:"Robo Soccer — Senior", short:"Soccer Sr",  tag:"League · 3 pts win, 1 draw",  type:"league", icon:"soccer", color:"#ff3d9a"},
   {id:"race",      name:"Robo Race",            short:"Race",       tag:"Timed · fastest wins",        type:"time",   icon:"race",   color:"#22e4ff"},
 ];
-const STATUSES = {
-  time:   ["Not started","Attempt 1 done","Attempt 2 done","Finished"],
-  points: ["Not judged","Judging","Judged"],
-  league: ["Not started","Playing","Qualified","Eliminated"],
-};
-const statusClass = (type,s) => { if (s==="Eliminated") return "sx"; const i=STATUSES[type].indexOf(s); return type==="points" ? ["s0","s1","s3"][i]||"s0" : type==="league" ? ["s0","s1","s3"][i]||"s0" : "s"+Math.max(0,i); };
+const STATUS_LIST = ["Not started","Ongoing","Finished"];
+const STATUSES = {time:STATUS_LIST, points:STATUS_LIST, league:STATUS_LIST};
+const LEGACY_STATUS = {"Attempt 1 done":"Ongoing","Attempt 2 done":"Ongoing","Judging":"Ongoing","Playing":"Ongoing","Qualified":"Ongoing","Judged":"Finished","Eliminated":"Finished","Not judged":"Not started"};
+const normStatus = s => STATUS_LIST.includes(s) ? s : (LEGACY_STATUS[s] || "Not started");
+const statusClass = (type,s) => ({"Not started":"s0","Ongoing":"s1","Finished":"s3"})[normStatus(s)];
 const DEFAULT_CFG = {title:"ROBOCON", subtitle:"Hosted by TIPS Kochi School", penaltySec:5};
 
 /* ---------- state ---------- */
@@ -425,7 +424,7 @@ function setAccent(color){ document.documentElement.style.setProperty("--accent"
 /* ---------- views ---------- */
 const byTeam = (a,b)=>String(a.teamId).localeCompare(String(b.teamId),undefined,{numeric:true});
 function penWord(type,n){ return type==="time" ? (n===1?"penalty":"penalties") : (n===1?"penalty point":"penalty points"); }
-function pubOf(d){ return {category:d.category, teamId:d.teamId, status:d.status||"", penalties:Number(d.penalties)||0, reasons:Array.isArray(d.reasons)?d.reasons:[], updatedAt:d.updatedAt||Date.now()}; }
+function pubOf(d){ return {category:d.category, teamId:d.teamId, status:normStatus(d.status), penalties:Number(d.penalties)||0, reasons:Array.isArray(d.reasons)?d.reasons:[], updatedAt:d.updatedAt||Date.now()}; }
 function catChips(active, prefix){
   return `<nav class="cats">
     <a class="cat ${!active?"on":""}" href="#${prefix}" style="--c:#8b5cff"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><span>All categories<small>Overview</small></span></a>
@@ -439,10 +438,14 @@ function penRowHTML(t, type){
   const n = t.penalties||0;
   return `<tr class="${flash}">
     <td class="team">${esc(t.teamId)}</td>
-    <td>${t.status?`<span class="pill ${statusClass(type,t.status)}">${esc(t.status)}</span>`:`<span class="dim">—</span>`}</td>
+    <td><span class="pill ${statusClass(type,t.status)}">${esc(normStatus(t.status))}</span></td>
     <td>${n?`<span class="penbadge">${fmtNum(n)} ${penWord(type,n)}</span>`:`<span class="penbadge zero">None</span>`}</td>
     <td>${t.reasons.length?`<ul class="reasons">${t.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`:`<span class="dim">${n?"No reason given yet":"—"}</span>`}</td>
   </tr>`;
+}
+function countsText(catId){
+  const l = pub.filter(t=>t.category===catId), on = l.filter(t=>normStatus(t.status)==="Ongoing").length, fin = l.filter(t=>normStatus(t.status)==="Finished").length;
+  return `${l.length} teams · ${on} ongoing · ${fin} finished`;
 }
 function renderOverview(){
   setAccent("#22e4ff");
@@ -450,15 +453,16 @@ function renderOverview(){
   $("#view").innerHTML = `
     ${catChips(null,"board")}
     <section class="stats">
-      <div class="stat"><div class="k">Categories</div><div class="v">${CATS.length}</div></div>
       <div class="stat"><div class="k">Teams</div><div class="v">${pub.length}</div></div>
-      <div class="stat"><div class="k">Teams with penalties</div><div class="v">${withPen.length}<small> / ${pub.length}</small></div></div>
+      <div class="stat"><div class="k">Ongoing</div><div class="v" style="color:var(--cyan)">${pub.filter(t=>normStatus(t.status)==="Ongoing").length}</div></div>
+      <div class="stat"><div class="k">Finished</div><div class="v" style="color:var(--green)">${pub.filter(t=>normStatus(t.status)==="Finished").length}<small> / ${pub.length}</small></div></div>
       <div class="stat"><div class="k">Status</div><div class="v" style="font-size:16px;margin-top:14px"><span class="live" id="liveBoard"><i></i>LIVE</span></div></div>
     </section>
     <section class="overview">
       ${CATS.map(c=>{ const l=pub.filter(t=>t.category===c.id && t.penalties>0).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,6);
         return `<a class="ov" href="#board-${c.id}" style="--c:${c.color}">
-          <div class="hd"><div class="ic">${ICONS[c.icon]}</div><div><b>${esc(c.name)}</b><span>Latest penalties</span></div></div>
+          <div class="hd"><div class="ic">${ICONS[c.icon]}</div><div><b>${esc(c.name)}</b><span>${countsText(c.id)}</span></div></div>
+          <div class="dim" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:4px 0 2px">Latest penalties</div>
           ${l.length?l.map(t=>`<div class="pl"><b>${esc(t.teamId)}</b><span>${esc(t.reasons[t.reasons.length-1]||"")}</span><em>${fmtNum(t.penalties)} ${penWord(c.type,t.penalties)}</em></div>`).join("")
                    :`<div class="dim" style="padding:14px 0;font-size:14px">${loaded?"No penalties so far":"Loading…"}</div>`}
         </a>`;}).join("")}
@@ -471,9 +475,9 @@ function renderCategory(catId){
   const list = pub.filter(t=>t.category===catId).sort(byTeam);
   $("#view").innerHTML = `
     ${catChips(catId,"board")}
-    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>Penalties and reasons</p></div></div>
+    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>${countsText(catId)}</p></div></div>
     <section class="card">
-      <h3>Penalties <span class="hint">Updates automatically</span></h3>
+      <h3>Teams <span class="hint">Status, penalties and reasons · updates automatically</span></h3>
       ${list.length?`<div class="scroll"><table>${PEN_HEAD}<tbody>${list.map(t=>penRowHTML(t,c.type)).join("")}</tbody></table></div>`:emptyState()}
     </section>
     <p class="note"><span class="live" id="liveBoard"><i></i>LIVE</span> &nbsp;Use <a href="#tv-${c.id}">TV display</a> for the big screen.</p>`;
@@ -493,9 +497,9 @@ function renderTV(){
   $("#catDots").innerHTML = tvPinned ? "" : CATS.map(x=>`<span class="${x.id===c.id?"on":""}">${esc(x.short)}</span>`).join("");
   const list = pub.filter(t=>t.category===c.id).sort(byTeam);
   $("#view").innerHTML = `
-    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>Penalties and reasons</p></div></div>
+    <div class="cathead"><div class="ic">${ICONS[c.icon]}</div><div><h2>${esc(c.name)}</h2><p>${countsText(c.id)}</p></div></div>
     <section class="card">
-      <h3>Penalties <span class="hint" id="tvHint"></span></h3>
+      <h3>Teams <span class="hint" id="tvHint"></span></h3>
       <div class="tablebox" id="tvBox">${list.length?"":emptyState()}</div>
       <div class="progress"><i id="tvProg"></i></div>
     </section>`;
@@ -532,7 +536,7 @@ function lockHTML(title, msg, btn){
 }
 function draftOf(t){
   if (drafts[t.id]) return drafts[t.id];
-  return {teamId:t.teamId??"", status:t.status||STATUSES[catById(t.category).type][0],
+  return {teamId:t.teamId??"", status:normStatus(t.status),
     a1:t.a1raw ?? (t.a1??""), a2:t.a2raw ?? (t.a2??""), penalties:t.penalties??0,
     score:t.score??"", w:t.w??0, d:t.d??0, l:t.l??0, gf:t.gf??0, ga:t.ga??0, reasons:(t.reasons||[]).join("\n")};
 }
